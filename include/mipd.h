@@ -15,6 +15,8 @@ struct daemon_context {
 	uint8_t mip_address; //8 bit int, src/dst for passing up/down
 
 	int raw_file_descriptor;//network connection
+				//
+	int upper_listening_file_descriptor; //listen for new connection if old one is terminated.
 	int upper_client_file_descriptor;//local client
 					 //
 	const char *socket_upper_path;
