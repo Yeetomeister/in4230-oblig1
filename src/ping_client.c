@@ -87,7 +87,7 @@ int main(int argc, char *argv[]){
 	 */
 	payload_length = snprintf((char *)(buffer + 1), sizeof(buffer) - 1, "PING:%s", message);
 
-	if(message_length < 0 || payload_length > (int)(sizeof(buffer) - 1)) {
+	if(payload_length < 0 || payload_length > (int)(sizeof(buffer) - 1)) {
 		fprintf(stderr, "ping message is too long\n");
 		close(file_descriptor);
 		return 1;

@@ -8,6 +8,11 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+//raw sockets
+#include <arpa/inet.h>
+#include <linux/if_packet.h>
+#include <sys/socket.h>
+
 #include "../include/mipd.h"
 
 void print_usage(const char *program_name){
@@ -44,7 +49,7 @@ static int create_upper_listening_socket(const char *socket_path){
 
 	if (file_descriptor == -1) {
 		perror("failed to get socket from file dscrptr");
-		return 1;
+		return -1;
 	}
 
 	/**
@@ -98,7 +103,7 @@ static int create_upper_listening_socket(const char *socket_path){
 static int accept_upper_client(int listening_file_descriptor) {
 	int client_file_descriptor;
 
-	printf("waiting for message");//accept will hang, so nice to know we reached the correct point
+	printf("waiting for message\n");//accept will hang, so nice to know we reached the correct point
 
 	client_file_descriptor = accept(listening_file_descriptor, NULL, NULL);
 
@@ -138,10 +143,25 @@ static int receive_upper_layer_message(int client_file_descriptor) {
 	printf("received message destined for address: %u\n", (unsigned int)buffer[0]);
 	printf("Payload: ");
 	//write buffer out as raw data
-	fwrite(buffer +1, 1, (size_t)received_bytes -1, stdout);
+	fwrite(buffer + 1, 1, (size_t)received_bytes -1, stdout);
 	printf("\n");
 	
 	return 0;
+}
+
+/**
+ *Basically copy paste of line 180
+https://github.com/kristjoc/plenaries-in3230-in4230-h26/blob/main/p2_02-09-2026/sockets/raw_sockets/sender.c
+ */
+static int create_mip_raw_socket(void) {
+	int raw_sock = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_MIP));
+
+	if (raw_sock == -1) {
+		perror("Raw socket fail\n");
+		return -1;
+	}
+
+	return raw_sock;
 }
 
 
@@ -150,7 +170,7 @@ int main(int argc, char *argv[]){
 	struct daemon_context context = {
 		.debug = false,
 		.mip_address = 0,
-		.raw_file_descriptor = -1,
+		.raw_socket = -1,
 		.upper_listening_file_descriptor = -1,
 		.upper_client_file_descriptor = -1,
 		.socket_upper_path = NULL
@@ -194,7 +214,22 @@ int main(int argc, char *argv[]){
 
 	context.socket_upper_path = socket_path;
 
+	//Create UNIX listening socket
 	context.upper_listening_file_descriptor = create_upper_listening_socket(context.socket_upper_path);
+
+	if (context.upper_listening_file_descriptor == -1) {
+		return 1;
+	}
+
+	//Create unix raw socket
+	context.raw_socket = create_mip_raw_socket();
+
+	if (context.raw_socket == -1) {
+		close(context.upper_listening_file_descriptor);
+		unlink(context.socket_upper_path);
+		return 1;
+	}
+	printf("raw mip socket was created\n");
 
 	context.upper_client_file_descriptor = accept_upper_client(context.upper_listening_file_descriptor);
 
@@ -229,6 +264,7 @@ int main(int argc, char *argv[]){
 	 */
 	close(context.upper_client_file_descriptor);
 	close(context.upper_listening_file_descriptor);
+	close(context.raw_socket);
 	unlink(context.socket_upper_path);
 
 	return 0;
