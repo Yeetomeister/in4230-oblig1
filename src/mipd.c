@@ -13,6 +13,9 @@
 #include <linux/if_packet.h>
 #include <sys/socket.h>
 
+//eth
+#include <ifaddrs.h>
+
 #include "../include/mipd.h"
 
 void print_usage(const char *program_name){
@@ -164,6 +167,67 @@ static int create_mip_raw_socket(void) {
 	return raw_sock;
 }
 
+/**
+ *Find packet interfaces
+ *
+ *the context supplied will receive the discovered interfaces to their sockaddr_ll interface list.
+ * Return 0 if one or multiple interfaces was found, -1 on error.
+ */
+static int discover_interfaces(struct daemon_context *context) {
+	struct ifaddrs *interfaces;
+	struct ifaddrs *current;
+
+	if (getifaddrs(&interfaces) == -1) {
+		perror("failed to get eth address");
+		return -1;
+	}
+
+	//arrow because we have pointer to the context
+	context->interface_count = 0;
+
+	for (current = interfaces; current != NULL; current = current->ifa_next) {
+		if(current->ifa_addr == NULL) {
+			continue;
+		}
+		if (current->ifa_addr->sa_family != AF_PACKET) {
+			continue;
+		}
+		if(strcmp(current->ifa_name, "lo") == 0) {
+			continue;
+		}
+		if (context->interface_count >= MAX_INTERFACES) {
+			fprintf(stderr, "Too many network interfaces\n");
+			freeifaddrs(interfaces);
+			return -1;
+		}
+
+		//Place the current ifa address into context interface list at index corresponding to the amunt of existing addresses
+		memcpy(&context->interfaces[context->interface_count],current->ifa_addr, sizeof(struct sockaddr_ll));
+
+
+		context->interface_count++;
+
+	}
+
+	freeifaddrs(interfaces);
+
+	if(context->interface_count == 0) {
+		fprintf(stderr,"no usable ethernet interfaces found.\n");
+		return -1;
+	}
+	
+	return 0;
+
+}
+
+
+static void print_mac_address(const unsigned char *mac, unsigned char length) {
+	unsigned int i;
+
+	for (i = 0; i < length; i++) {
+		printf("%02x%s",mac[i], (i + 1 == length) ? "" : ":");
+	}
+}
 
 
 int main(int argc, char *argv[]){
@@ -230,6 +294,26 @@ int main(int argc, char *argv[]){
 		return 1;
 	}
 	printf("raw mip socket was created\n");
+	
+	
+	if(discover_interfaces(&context) == -1) {
+		close(context.raw_socket);
+		close(context.upper_listening_file_descriptor);
+		unlink(context.socket_upper_path);
+		return 1;
+	}
+	printf("Found %u network interfaces\n", context.interface_count);
+
+	if (context.debug) {
+		unsigned int i;
+
+		for (i = 0; i < context.interface_count; i++) {
+			const struct sockaddr_ll *interface = &context.interfaces[i];
+			printf("Interface index %d, mac ", interface->sll_ifindex);
+			print_mac_address(interface->sll_addr, interface->sll_halen);
+			printf("\n");
+		}
+	}
 
 	context.upper_client_file_descriptor = accept_upper_client(context.upper_listening_file_descriptor);
 
