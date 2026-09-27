@@ -10,6 +10,7 @@
 #define ETH_P_MIP 0x88B5
 #define MIP_ADDR_BROADCAST 255u
 #define MAX_INTERFACES 10 //would not expect more than 2 eth interfaces for node B, but having some headroom here could be nice.
+#define MIP_HEADER_SIZE 4u //4 bytes = 32 bits
 
 struct daemon_context {
 	bool debug;
@@ -28,7 +29,17 @@ struct daemon_context {
 
 void print_usage(const char *program_name);
 
-//struct mip_header {}
+struct mip_header {
+	uint8_t destination;
+	uint8_t source;
+	uint8_t ttl; //4 bit uint does not exist natively
+	uint16_t sdu_length_words; //9 bits
+	uint8_t sdu_type; //upper layer protocol type. 3 bits in spec
+};
+
+int encode_mip_header(const struct mip_header *header, uint8_t output[MIP_HEADER_SIZE]);
+
+int decode_mip_header(const uint8_t input[MIP_HEADER_SIZE], struct mip_header *header);
 
 
 #endif

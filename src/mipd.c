@@ -229,6 +229,65 @@ static void print_mac_address(const unsigned char *mac, unsigned char length) {
 	}
 }
 
+/**
+ *pack MIP header fields into a four-byte
+ *
+ *header: fields t encode
+ *output: four-byte buffer taht receives the encoded header
+ *
+ * return 0 on success, -1 on error
+ */
+int encode_mip_header(const struct mip_header *header, uint8_t output[MIP_HEADER_SIZE]) {
+	uint32_t packed;
+	uint32_t network_order;
+
+	if (header == NULL || output == NULL) {
+		fprintf(stderr, "provided argument is NULL\n");
+		return -1;
+	}
+
+	//from the mip spec we find that the header should be 32 bit. We can fit all of it in a uint32_t
+	packed = ((uint32_t)header->destination << 24)
+		| ((uint32_t)header->source << 16)
+		| ((uint32_t)header->ttl << 12)
+		| ((uint32_t)header->sdu_length_words << 3)
+		| (uint_32t)header->sdu_type;
+
+	network_order = htonl(packed);
+	memcpy(output, &network_order, MIP_HEADER_SIZE);
+
+	return 0;
+		
+}
+
+/**
+ *Unpack four network bytes into mip header fields
+ *
+ *input: four byte encoded header
+ *header: struct that receives the output fields
+ *
+ *return 0 on success or -1 on error
+ */
+int decode_mip_address(const uint8_t input[MIP_HEADER_SIZE], struct mip_header *header) {
+	uint32_t network_order;
+	uint32_t packed;
+
+	if (input == NULL || header == NULL) {
+		return -1;
+	}
+
+	memcpy(&network_order, input, MIP_HEADER_SIZE);
+	packed = ntohl(network_order);
+
+	//TODO, have to add mask in order to only include the desired values. Do not have the brain capacity for this rn.
+	header->destination = (uint8_t)(packed >> 24);
+	header->source = (uint8_t)(packed >> 16);
+	header->ttl = (uint8_t)(packed >> 12);
+	header->sdu_length_words = (uint16_t)(packed >> 3);
+	header->sdu_type = (uint8_t)(packed);
+
+}
+
 
 int main(int argc, char *argv[]){
 	struct daemon_context context = {
