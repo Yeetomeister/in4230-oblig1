@@ -296,12 +296,17 @@ int decode_mip_header(const uint8_t input[MIP_HEADER_SIZE], struct mip_header *h
 }
 
 /**
+ *Build mip pdu from provided header and sdu payload.
  *
+ *header: header consisting of mip addresses, ttl and sdu type
+ *sdu: payload bytes
+ *sdu_length_bytes: number of data payload bytes
+ *pdu: output buffer for encoded header and padded sdu.
+ *pdu_capacity: number of available bytes in the pdu.
+ *pdu_length: receives number of bytes written to the pdu.
  *
- *
- *
- *
- *
+ *returns 0 on success or -1 on error. Error on invalid arguments, too large SDU, too small output buffer, header failes to encoded.
+ *sdu is compied and appended zero bytes as padding to achieve multiple of four.
  */
 static int build_mip_pdu(const struct mip_header *header, const uint8_t *sdu, size_t sdu_length_bytes, uint8_t *pdu, size_t pdu_capacity, size_t *pdu_length) {
 	struct mip_header completed_header;
@@ -390,32 +395,6 @@ int main(int argc, char *argv[]){
 		printf("MIP address has to be number between 0 and 255\n");
 		return 1;
 	}
-
-
-	struct mip_header test = {
-		.destination = 2,
-		.source = 1,
-		.ttl = 1,
-		.sdu_length_words = 0,
-		.sdu_type = MIP_SDU_TYPE_PING
-	};
-
-	const uint8_t test_sdu[] = "PING:hi";
-	uint8_t test_pdu[MAX_MIP_PDU_SIZE];
-	size_t test_pdu_length;
-	unsigned int i;
-
-	if (build_mip_pdu(&test, test_sdu, sizeof(test_sdu) -1, test_pdu, sizeof(test_pdu), &test_pdu_length) == -1) {
-		fprintf(stderr, "build of test MIP pdu failed\n");
-		return 1;
-	}
-
-	printf("PDU bytes:");
-	for (i = 0; i < test_pdu_length; i++) {
-		printf(" %02x", (unsigned int)test_pdu[i]);
-	}
-	printf("\n");
-
 
 	context.socket_upper_path = socket_path;
 
