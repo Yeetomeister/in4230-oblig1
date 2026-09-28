@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11
+CFLAGS = -Wall -Wextra -std=gnu11
 TARGETS = mipd ping_client
 .PHONY: all clean
 

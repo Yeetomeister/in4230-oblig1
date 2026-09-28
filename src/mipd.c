@@ -123,7 +123,7 @@ static int accept_upper_client(int listening_file_descriptor) {
 
 /**
  *Receive message and dst host from upper ping client.
- *The docuemntation says that the command line arguments should be message then mip address. But switching this in the internal logic makes it easier to separate the address from message as the addres has constant size. This will surely make problems later, but seems like the best solution
+ *
  *
  */
 static int receive_upper_layer_message(int client_file_descriptor) {
@@ -475,7 +475,7 @@ int main(int argc, char *argv[]){
 	}
 
 	if (parse_mip_address(address_text, &context.mip_address) == -1){
-		printf("MIP address has to be number between 0 and 255\n");
+		printf("MIP address has to be number between 0 and 254\n");
 		return 1;
 	}
 
@@ -524,7 +524,7 @@ int main(int argc, char *argv[]){
 
 	if (context.upper_client_file_descriptor == -1) {
 		close(context.upper_listening_file_descriptor);
-		close(context.upper_client_file_descriptor);
+		close(context.raw_socket);
 		unlink(context.socket_upper_path);
 		return 1;
 	}
@@ -534,7 +534,7 @@ int main(int argc, char *argv[]){
 		close(context.upper_client_file_descriptor);
 		close(context.upper_listening_file_descriptor);
 		unlink(context.socket_upper_path);
-		return -1;
+		return 1;
 	}
 
 	printf("Unix listening socket was created\n");
