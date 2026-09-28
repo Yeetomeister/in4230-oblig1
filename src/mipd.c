@@ -375,7 +375,7 @@ static int build_ethernet_frame(const uint8_t destination_mac[6],
 				size_t *frame_length) {
 	uint16_t network_ethertype;
 
-	if(destination_mac == NULL || source_mac == NULL || pdu == NULL || frame == NULL || frame_length || NULL) {
+	if(destination_mac == NULL || source_mac == NULL || pdu == NULL || frame == NULL || frame_length ==  NULL) {
 		return -1;
 	}
 
@@ -416,9 +416,9 @@ static int send_ethernet_frame(struct daemon_context *context,
 	}
 
 	memset(&target, 0, sizeof(target));
-	target.sll_familiy = AF_PACKET;
+	target.sll_family = AF_PACKET;
 	target.sll_protocol = htons(ETH_P_MIP);
-	target.sll_ifindex = context->interfaces[interface_number].sll_infindex;
+	target.sll_ifindex = context->interfaces[interface_number].sll_ifindex;
 	target.sll_halen = 6;
 	memcpy(target.sll_addr, destination_mac, 6);
 
