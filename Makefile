@@ -14,8 +14,8 @@ ping_client: src/ping_client.o
 src/mipd.o: src/mipd.c include/mipd.h
 	$(CC) $(CFLAGS) -c src/mipd.c -o src/mipd.o
 
-src/ping_client: src/ping_client.c
-	$(CC) $(CFLAGS) -c src/ping_client -o src/ping_client.o
+src/ping_client.o: src/ping_client.c
+	$(CC) $(CFLAGS) -c src/ping_client.c -o src/ping_client.o
 
 clean:
 	rm -f $(TARGETS) src/mipd.o src/ping_client.o
