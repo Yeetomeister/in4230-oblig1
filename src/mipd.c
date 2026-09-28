@@ -132,6 +132,11 @@ static int receive_upper_layer_message(int client_file_descriptor) {
 
 	received_bytes = recv(client_file_descriptor, buffer, sizeof(buffer), 0);
 
+	if(received_bytes == -1) {
+		perror("invalid receive");
+		return -1;
+	}
+
 	if (received_bytes == 0) {
 		printf("Client closed connection without sending data\n");
 		return -1;
