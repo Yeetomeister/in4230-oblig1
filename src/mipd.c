@@ -251,7 +251,7 @@ int encode_mip_header(const struct mip_header *header, uint8_t output[MIP_HEADER
 		| ((uint32_t)header->source << 16)
 		| ((uint32_t)header->ttl << 12)
 		| ((uint32_t)header->sdu_length_words << 3)
-		| (uint_32t)header->sdu_type;
+		| (uint32_t)header->sdu_type;
 
 	network_order = htonl(packed);
 	memcpy(output, &network_order, MIP_HEADER_SIZE);
@@ -268,7 +268,7 @@ int encode_mip_header(const struct mip_header *header, uint8_t output[MIP_HEADER
  *
  *return 0 on success or -1 on error
  */
-int decode_mip_address(const uint8_t input[MIP_HEADER_SIZE], struct mip_header *header) {
+int decode_mip_header(const uint8_t input[MIP_HEADER_SIZE], struct mip_header *header) {
 	uint32_t network_order;
 	uint32_t packed;
 
@@ -279,13 +279,20 @@ int decode_mip_address(const uint8_t input[MIP_HEADER_SIZE], struct mip_header *
 	memcpy(&network_order, input, MIP_HEADER_SIZE);
 	packed = ntohl(network_order);
 
-	//TODO, have to add mask in order to only include the desired values. Do not have the brain capacity for this rn.
+
 	header->destination = (uint8_t)(packed >> 24);
 	header->source = (uint8_t)(packed >> 16);
-	header->ttl = (uint8_t)(packed >> 12);
-	header->sdu_length_words = (uint16_t)(packed >> 3);
-	header->sdu_type = (uint8_t)(packed);
 
+	//ttl:4b, uint8:8b, mask: 0000 1111 = F
+	header->ttl = (uint8_t)((packed >> 12) & 0x0F);
+
+	//sdu_len:9b, uint16:16b. mask: 0000 0001 1111 1111 = 1FF
+	header->sdu_length_words = (uint16_t)((packed >> 3) & 0x01FF);
+
+	//sdu_type:3b, uint8:8b, mask:0000 0111 = 7
+	header->sdu_type = (uint8_t)(packed & 0x07);
+
+	return 0;
 }
 
 
@@ -334,6 +341,35 @@ int main(int argc, char *argv[]){
 		printf("MIP address has to be number between 0 and 255\n");
 		return 1;
 	}
+
+	//test implemented header encoding and decoding
+	struct mip_header example = {
+		.destination = 2,
+		.source = 1,
+		.ttl = 1,
+		.sdu_length_words = 2,
+		.sdu_type = MIP_SDU_TYPE_PING
+	};
+
+	struct mip_header decoded;
+	uint8_t bytes[MIP_HEADER_SIZE];
+	unsigned int i;
+
+	if (encode_mip_header(&example, bytes) == -1 || decode_mip_header(bytes, &decoded) == -1) {
+		fprintf(stderr, "encode or decode failed");
+		return 1;
+	}
+
+	printf("encoded header:");
+	for (i = 0; i < MIP_HEADER_SIZE; i++) {
+		printf(" %02x", (unsigned int)(bytes[i]));
+	};
+	printf("\nDecoded destination=%u source=%u TTL=%u length=%u words type=%u \n",
+		(unsigned int)decoded.destination,
+		(unsigned int)decoded.source,
+		(unsigned int)decoded.ttl,
+		(unsigned int)decoded.sdu_length_words,
+		(unsigned int)decoded.sdu_type);
 
 	context.socket_upper_path = socket_path;
 

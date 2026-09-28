@@ -12,6 +12,10 @@
 #define MAX_INTERFACES 10 //would not expect more than 2 eth interfaces for node B, but having some headroom here could be nice.
 #define MIP_HEADER_SIZE 4u //4 bytes = 32 bits
 
+//MIP sdu types
+#define MIP_SDU_TYPE_ARP 0x01
+#define MIP_SDU_TYPE_PING 0x02 
+
 struct daemon_context {
 	bool debug;
 	uint8_t mip_address; //8 bit int, src/dst for passing up/down
