@@ -50,7 +50,7 @@ int main(int argc, char *argv[]){
 
 	if (parse_mip_address(argv[3], &destination_address) == -1) {
 		fprintf(stderr, "Destination not valid MIP address\n");
-		return -1;
+		return 1;
 	}
 
 	file_descriptor = socket(AF_UNIX, SOCK_SEQPACKET, 0);
