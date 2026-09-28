@@ -6,6 +6,7 @@
 #include <linux/if_packet.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <linux/if_ether.h>
 
 #define ETH_P_MIP 0x88B5
 #define MIP_ADDR_BROADCAST 255u
@@ -15,8 +16,14 @@
 //MIP sdu types
 #define MIP_SDU_TYPE_ARP 0x01
 #define MIP_SDU_TYPE_PING 0x02
+
+//SDU and PDU
 #define MAX_SDU_BYTES (511u * 4)//SDU len header field has 9 bits, thus 2^9 = 512 possibilities. But we found 0 bit, so i think 511 should be set here
 #define MAX_MIP_PDU_SIZE (MIP_HEADER_SIZE + MAX_SDU_BYTES)
+
+//raw eth
+#define ETHERNET_HEADER_SIZE ETH_HLEN //14 bytes
+#define MAX_ETHERNET_FRAME_SIZE (ETHERNET_HEADER_SIZE + MAX_MIP_PDU_SIZE)
 
 struct daemon_context {
 	bool debug;

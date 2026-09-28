@@ -308,7 +308,13 @@ int decode_mip_header(const uint8_t input[MIP_HEADER_SIZE], struct mip_header *h
  *returns 0 on success or -1 on error. Error on invalid arguments, too large SDU, too small output buffer, header failes to encoded.
  *sdu is compied and appended zero bytes as padding to achieve multiple of four.
  */
-static int build_mip_pdu(const struct mip_header *header, const uint8_t *sdu, size_t sdu_length_bytes, uint8_t *pdu, size_t pdu_capacity, size_t *pdu_length) {
+static int build_mip_pdu(const struct mip_header *header,
+			const uint8_t *sdu,
+			size_t sdu_length_bytes,
+			uint8_t *pdu,
+			size_t pdu_capacity,
+			size_t *pdu_length) {
+
 	struct mip_header completed_header;
 	size_t padded_sdu_length;
 
@@ -348,6 +354,48 @@ static int build_mip_pdu(const struct mip_header *header, const uint8_t *sdu, si
 
 	return 0;
 }
+
+
+/**
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ */
+static int build_ethernet_frame(const uint8_t destination_mac[6],
+				const uint8_t source_mac[6],
+				const uint8_t *pdu,
+				size_t pdu_length,
+				uint8_t *frame,
+				size_t frame_capacity,
+				size_t *frame_length) {
+	uint16_t network_ethertype;
+
+	if(destination_mac == NULL || source_mac == NULL || pdu == NULL || frame == NULL || frame_length || NULL) {
+		return -1;
+	}
+
+	if (ETHERNET_HEADER_SIZE + pdu_length > frame_capacity) {
+		return -1;
+	}
+
+	memcpy(frame, destination_mac, 6);
+	memcpy(frame + 6, source_mac, 6);
+
+	network_ethertype = htons(ETH_P_MIP);
+	memcpy(frame + 12, &network_ethertype, sizeof(network_ethertype));
+
+	memcpy(frame + ETHERNET_HEADER_SIZE, pdu, pdu_length);
+
+	*frame_length = ETHERNET_HEADER_SIZE + pdu_length;
+
+	return 0;
+}
+
 
 
 int main(int argc, char *argv[]){
