@@ -522,8 +522,9 @@ int main(int argc, char *argv[]){
 
 
 
-	if (context.upper_listening_file_descriptor == -1) {
+	if (context.upper_client_file_descriptor == -1) {
 		close(context.upper_listening_file_descriptor);
+		close(context.upper_client_file_descriptor);
 		unlink(context.socket_upper_path);
 		return 1;
 	}
