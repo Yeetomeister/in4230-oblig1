@@ -533,6 +533,7 @@ int main(int argc, char *argv[]){
 	if (receive_upper_layer_message(context.upper_client_file_descriptor) == -1) {
 		close(context.upper_client_file_descriptor);
 		close(context.upper_listening_file_descriptor);
+		close(context.raw_socket);
 		unlink(context.socket_upper_path);
 		return 1;
 	}
