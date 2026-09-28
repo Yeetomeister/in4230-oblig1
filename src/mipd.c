@@ -397,6 +397,41 @@ static int build_ethernet_frame(const uint8_t destination_mac[6],
 }
 
 
+static int send_ethernet_frame(struct daemon_context *context,
+				unsigned int interface_number,
+				const uint8_t destination_mac[6],
+				const uint8_t *frame,
+				size_t frame_length) {
+
+	struct sockaddr_ll target;
+	ssize_t sent_bytes;
+
+	if (context == NULL || destination_mac == NULL || frame == NULL) {
+		return -1;
+	}
+
+	if (interface_number >= context->interface_count) {
+		fprintf(stderr, "invalid interface number");
+		return -1;
+	}
+
+	memset(&target, 0, sizeof(target));
+	target.sll_familiy = AF_PACKET;
+	target.sll_protocol = htons(ETH_P_MIP);
+	target.sll_ifindex = context->interfaces[interface_number].sll_infindex;
+	target.sll_halen = 6;
+	memcpy(target.sll_addr, destination_mac, 6);
+
+	sent_bytes = sendto(context->raw_socket, frame, frame_length, 0, (struct sockaddr *)&target, sizeof(target));
+
+	if (sent_bytes == -1) {
+		perror("failed to send bytes");
+		return -1;
+	}
+
+	return 0;
+}
+
 
 int main(int argc, char *argv[]){
 	struct daemon_context context = {
