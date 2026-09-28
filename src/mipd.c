@@ -342,35 +342,7 @@ int main(int argc, char *argv[]){
 		return 1;
 	}
 
-	//test implemented header encoding and decoding
-	struct mip_header example = {
-		.destination = 2,
-		.source = 1,
-		.ttl = 1,
-		.sdu_length_words = 2,
-		.sdu_type = MIP_SDU_TYPE_PING
-	};
-
-	struct mip_header decoded;
-	uint8_t bytes[MIP_HEADER_SIZE];
-	unsigned int i;
-
-	if (encode_mip_header(&example, bytes) == -1 || decode_mip_header(bytes, &decoded) == -1) {
-		fprintf(stderr, "encode or decode failed");
-		return 1;
-	}
-
-	printf("encoded header:");
-	for (i = 0; i < MIP_HEADER_SIZE; i++) {
-		printf(" %02x", (unsigned int)(bytes[i]));
-	};
-	printf("\nDecoded destination=%u source=%u TTL=%u length=%u words type=%u \n",
-		(unsigned int)decoded.destination,
-		(unsigned int)decoded.source,
-		(unsigned int)decoded.ttl,
-		(unsigned int)decoded.sdu_length_words,
-		(unsigned int)decoded.sdu_type);
-
+	
 	context.socket_upper_path = socket_path;
 
 	//Create UNIX listening socket
