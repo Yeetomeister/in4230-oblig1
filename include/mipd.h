@@ -14,7 +14,9 @@
 
 //MIP sdu types
 #define MIP_SDU_TYPE_ARP 0x01
-#define MIP_SDU_TYPE_PING 0x02 
+#define MIP_SDU_TYPE_PING 0x02
+#define MAX_SDU_BYTES (511u * 4)//SDU len header field has 9 bits, thus 2^9 = 512 possibilities. But we found 0 bit, so i think 511 should be set here
+#define MAX_MIP_PDU_SIZE (MIP_HEADER_SIZE + MAX_SDU_BYTES)
 
 struct daemon_context {
 	bool debug;

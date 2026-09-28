@@ -295,6 +295,55 @@ int decode_mip_header(const uint8_t input[MIP_HEADER_SIZE], struct mip_header *h
 	return 0;
 }
 
+/**
+ *
+ *
+ *
+ *
+ *
+ *
+ */
+static int build_mip_pdu(const struct mip_header *header, const uint8_t *sdu, size_t sdu_length_bytes, uint8_t *pdu, size_t pdu_capacity, size_t *pdu_length) {
+	struct mip_header completed_header;
+	size_t padded_sdu_length;
+
+	if(header == NULL || pdu == NULL || pdu_length == NULL) {
+		return -1;
+	}
+
+	if(sdu_length_bytes > 0 && sdu == NULL) {
+		return -1;
+	}
+
+	if(sdu_length_bytes > MAX_SDU_BYTES) {
+		return -1;
+	}
+
+	//from mip spec, round to next multiple of 4. Use integer div to discard decimals then multiply up to a whole multiple of 4
+	padded_sdu_length = ((sdu_length_bytes + 3u) / 4u) * 4u;
+
+	if (MIP_HEADER_SIZE + padded_sdu_length > pdu_capacity) {
+		return -1;
+	}
+
+	completed_header = *header;
+	completed_header.sdu_length_words = (uint16_t)(padded_sdu_length / 4u);
+
+	if (encode_mip_header(&completed_header, pdu) == -1) {
+		return -1;
+	}
+
+	if(sdu_length_bytes > 0) {
+		memcpy(pdu + MIP_HEADER_SIZE, sdu, sdu_length_bytes);
+	}
+
+	memset(pdu + MIP_HEADER_SIZE + sdu_length_bytes, 0, padded_sdu_length - sdu_length_bytes);
+
+	*pdu_length = MIP_HEADER_SIZE + padded_sdu_length;
+
+	return 0;
+}
+
 
 int main(int argc, char *argv[]){
 	struct daemon_context context = {
@@ -342,7 +391,32 @@ int main(int argc, char *argv[]){
 		return 1;
 	}
 
-	
+
+	struct mip_header test = {
+		.destination = 2,
+		.source = 1,
+		.ttl = 1,
+		.sdu_length_words = 0,
+		.sdu_type = MIP_SDU_TYPE_PING
+	};
+
+	const uint8_t test_sdu[] = "PING:hi";
+	uint8_t test_pdu[MAX_MIP_PDU_SIZE];
+	size_t test_pdu_length;
+	unsigned int i;
+
+	if (build_mip_pdu(&test, test_sdu, sizeof(test_sdu) -1, test_pdu, sizeof(test_pdu), &test_pdu_length) == -1) {
+		fprintf(stderr, "build of test MIP pdu failed\n");
+		return 1;
+	}
+
+	printf("PDU bytes:");
+	for (i = 0; i < test_pdu_length; i++) {
+		printf(" %02x", (unsigned int)test_pdu[i]);
+	}
+	printf("\n");
+
+
 	context.socket_upper_path = socket_path;
 
 	//Create UNIX listening socket
