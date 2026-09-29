@@ -617,6 +617,20 @@ int main(int argc, char *argv[]){
 
 				context.upper_client_file_descriptor = new_client;
 			}
+			else if (ready_file_descriptor == context.upper_client_file_descriptor) {
+				//app sent something or disconnected
+				int result = receive_upper_layer_message(&context);
+
+				if (result == 0) {
+					printf("local application disconnect\n");
+					epoll_ctl(epoll_feil_descriptor, EPOLL_CTL_DEL, ready_file_descriptor, NULL);
+					close(ready_file_descriptor);
+					context.upper_client_file_descriptor = -1;
+				}
+			}
+
+
+
 			else if (ready_file_descriptor == context.raw_socket) {
 				uint8_t frame[MAX_ETHERNET_FRAME_SIZE];
 				ssize_t frame_length = recv(context.raw_socket, frame, sizeof(frame), 0);
