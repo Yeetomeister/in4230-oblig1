@@ -129,7 +129,7 @@ static int accept_upper_client(int listening_file_descriptor) {
  *
  *returns 1 on message receive, 0 on client disconnect and -1 on error or incomplete message(only received address)
  */
-static int receive_upper_layer_message(struct deamon_context *context) {
+static int receive_upper_layer_message(struct daemon_context *context) {
 	uint8_t buffer[1024];
 	ssize_t received_bytes;
 
@@ -456,7 +456,7 @@ static int add_to_epoll(int epoll_file_descriptor, int file_descriptor) {
 	struct epoll_event event;
 
 	memset(&event, 0, sizeof(event));
-	event.events = EPOLLIN //will notify when there is something to be read.
+	event.events = EPOLLIN; //will notify when there is something to be read.
 	event.data.fd = file_descriptor; //keep track of the socket that notified
 					 //
 	if (epoll_ctl(epoll_file_descriptor, EPOLL_CTL_ADD, file_descriptor, &event) == -1) {
@@ -582,7 +582,7 @@ int main(int argc, char *argv[]){
 		return 1;
 	}
 
-	printf("mipd running with MIP address %U\n", context.mip_address);
+	printf("mipd running with MIP address %u\n", context.mip_address);
 
 	while(1) {
 		ready_count = epoll_wait(epoll_file_descriptor, events, MAX_EVENTS, -1);
@@ -610,7 +610,7 @@ int main(int argc, char *argv[]){
 					continue;
 				}
 
-				if (add_to_poll(epoll_file_descriptor, new_lient) == -1) {
+				if (add_to_epoll(epoll_file_descriptor, new_client) == -1) {
 					close(new_client);
 					continue;
 				}
