@@ -468,6 +468,82 @@ static int add_to_epoll(int epoll_file_descriptor, int file_descriptor) {
 }
 
 
+/**
+ *find which of the interfaces in context has a given kernel interface index
+ *
+ * context: daemon state with a list of interfaces that we wish to search
+ * interface_index: sll_ifindex as reported by kernel from recvfrom
+ *
+ *return index of requested interface or -1 if not found
+ */
+static int find_interface_by_index(const struct daemon_context *context, int interface_index) {
+	unsigned int i;
+
+	for(i = 0; i < context->interface_count; i++) {
+		if(context->interfaces[i].sll_ifindex == interface_index) {
+			return (int)i;
+		}
+	}
+
+	return -1;
+}
+
+/**
+ *print all valid entry in the mip-arp cache
+ *
+ *context: daemon state holding the table we inquire about
+ *
+ *no return, simply prints the result
+ */
+static void print_arp_cache(const struct daemon_context *context) {
+	unsigned int address;
+	bool empty = true;
+
+	printf("MIP-ARP cache:\n");
+
+	for (address = 0; address < ARP_CACHE_SIZE; address++) {
+		const struct arp_entry *entry = &context->arp_cache[address];
+
+		if(!entry->valid) {
+			continue;
+		}
+
+		empty = false;
+		printf(" MIP %3u -> ", address);
+		print_mac_address(entry->mac_address, MAC_ADDRESS_LENGTH);
+		printf(" (interface index %d)\n", context->interfaces[entry->interface_number].sll_ifindex);
+	}
+
+	if (empty) {
+		printf(" arp cache empty\n");
+	}
+}
+
+
+
+/**
+ *store or overwrite mapping of a mip address in arp cache
+ *
+ *context: daemon state holding the cache
+ *mip_address: the address for which entry we want to add or modify
+ *mac_address: the mac address which we want to add or modify
+ *interface_number: the interface that the neightbour is reached through
+ *
+ */
+static void arp_cache_update(struct daemon_context *context,
+				uint8_t mip_address,
+				const uint8_t mac_address[MAC_ADDRESS_LENGTH],
+				unsigned int interface_number) {
+	
+	struct arp_entry *entry = &context->arp_cache[mip_address];
+
+	entry->valid = true;
+	memcpy(entry->mac_address, mac_address, MAC_ADDRESS_LENGTH);
+	entry->interface_number = interface_number;
+}
+
+
+
 int main(int argc, char *argv[]){
 	struct daemon_context context = {
 		.debug = false,
