@@ -623,7 +623,7 @@ int main(int argc, char *argv[]){
 
 				if (result == 0) {
 					printf("local application disconnect\n");
-					epoll_ctl(epoll_feil_descriptor, EPOLL_CTL_DEL, ready_file_descriptor, NULL);
+					epoll_ctl(epoll_file_descriptor, EPOLL_CTL_DEL, ready_file_descriptor, NULL);
 					close(ready_file_descriptor);
 					context.upper_client_file_descriptor = -1;
 				}
