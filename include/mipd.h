@@ -10,7 +10,9 @@
 
 #define ETH_P_MIP 0x88B5
 #define MIP_ADDR_BROADCAST 255u
-#define MAX_INTERFACES 10 //would not expect more than 2 eth interfaces for node B, but having some headroom here could be nice.
+#define MAX_INTERFACES 10 //would not expect more than 2 eth interfaces for node B, but headroom is nice
+#define MAX_EVENTS 10 //max number of file descritors that should queue in epoll_wait.
+
 #define MIP_HEADER_SIZE 4u //4 bytes = 32 bits
 
 //MIP sdu types

@@ -122,27 +122,31 @@ static int accept_upper_client(int listening_file_descriptor) {
 }
 
 /**
- *Receive message and dst host from upper ping client.
+ *Receive one message from connected upper layer appliction
+ * message format from specification [8bit MIP address][payload (sdu)]
  *
+ * context: daemon state where we read the upper_client_file_descriptor
  *
+ *returns 1 on message receive, 0 on client disconnect and -1 on error or incomplete message(only received address)
  */
-static int receive_upper_layer_message(int client_file_descriptor) {
+static int receive_upper_layer_message(struct deamon_context *context) {
 	uint8_t buffer[1024];
 	ssize_t received_bytes;
 
-	received_bytes = recv(client_file_descriptor, buffer, sizeof(buffer), 0);
+	received_bytes = recv(context->upper_client_file_descriptor, buffer, sizeof(buffer), 0);
 
 	if(received_bytes == -1) {
 		perror("invalid receive");
 		return -1;
 	}
 
+	//0 denotes that connection was closed, so this return value is useful
 	if (received_bytes == 0) {
 		printf("Client closed connection without sending data\n");
-		return -1;
+		return 0;
 	}
 
-	//Assume specified command line arguments are enforced elsewhere, bad practice I know
+	//only address byte without payload
 	if (received_bytes == 1) {
 		printf("Received address but no message.\n");
 		return -1;
@@ -154,7 +158,8 @@ static int receive_upper_layer_message(int client_file_descriptor) {
 	fwrite(buffer + 1, 1, (size_t)received_bytes -1, stdout);
 	printf("\n");
 	
-	return 0;
+	//return 1 to denote success
+	return 1;
 }
 
 /**
@@ -438,6 +443,31 @@ static int send_ethernet_frame(struct daemon_context *context,
 }
 
 
+/**
+ *register file descriptor in the epoll instance so that epoll_wait reports when its ready
+ *inspired by add_to_epoll_table in chat.c plenary 02.09.
+ *
+ *epoll_file_descriptor: the epoll instance from epoll_create1
+ *file_desriptor: socket that we want to watch
+ *
+ *return 0 on success, -1 on error
+ */
+static int add_to_epoll(int epoll_file_descriptor, int file_descriptor) {
+	struct epoll_event event;
+
+	memset(&event, 0, sizeof(event));
+	event.events = EPOLLIN //will notify when there is something to be read.
+	event.data.fd = file_descriptor; //keep track of the socket that notified
+					 //
+	if (epoll_ctl(epoll_file_descriptor, EPOLL_CTL_ADD, file_descriptor, &event) == -1) {
+		perror("epoll_ctl failed");
+		return -1;
+	}
+
+	return 0;
+}
+
+
 int main(int argc, char *argv[]){
 	struct daemon_context context = {
 		.debug = false,
@@ -451,6 +481,12 @@ int main(int argc, char *argv[]){
 
 	const char *socket_path;
 	const char *address_text;
+
+	//loop variables
+	int epoll_file_descriptor;		//epoll instance watching the sockets
+	struct epoll_event events[MAX_EVENTS]; 	//is filled by epoll_wait with ready sockets
+	int ready_count;			//num of ready sockets. returned by epoll_wait
+	int i;
 
 	if (argc == 2 && strcmp(argv[1], "-h") == 0) {
 		print_usage(argv[0]);
@@ -523,40 +559,85 @@ int main(int argc, char *argv[]){
 		}
 	}
 
-	context.upper_client_file_descriptor = accept_upper_client(context.upper_listening_file_descriptor);
+	//context.upper_client_file_descriptor = accept_upper_client(context.upper_listening_file_descriptor);
+	epoll_file_descriptor = epoll_create1(0);
 
 
-
-	if (context.upper_client_file_descriptor == -1) {
-		close(context.upper_listening_file_descriptor);
+	if(epoll_file_descriptor == -1) {
+		perror("epoll_create1 fail");
 		close(context.raw_socket);
+		close(context.upper_listening_file_descriptor);
 		unlink(context.socket_upper_path);
 		return 1;
 	}
 
 
-	if (receive_upper_layer_message(context.upper_client_file_descriptor) == -1) {
-		close(context.upper_client_file_descriptor);
-		close(context.upper_listening_file_descriptor);
+	if (add_to_epoll(epoll_file_descriptor, context.raw_socket) == -1 ||
+		add_to_epoll(epoll_file_descriptor, context.upper_listening_file_descriptor) == -1) {
+		
+		close(epoll_file_descriptor);
 		close(context.raw_socket);
+		close(context.upper_listening_file_descriptor);
 		unlink(context.socket_upper_path);
 		return 1;
 	}
 
-	printf("Unix listening socket was created\n");
+	printf("mipd running with MIP address %U\n", context.mip_address);
 
-	printf("MIPD argumnt parsing success\n");
-	printf("UNIX socket path: %s\n", context.socket_upper_path);
-	printf("MIP address: %d\n", context.mip_address);
+	while(1) {
+		ready_count = epoll_wait(epoll_file_descriptor, events, MAX_EVENTS, -1);
 
-	if (context.debug){
-		printf("Debug mode active\n");
+		if (ready_count == -1) {
+			perror("epoll_wait fail");
+			break;
+		}
+
+		for (i = 0; i < ready_count; i++) {
+			int ready_file_descriptor = events[i].data.fd;
+
+			if(ready_file_descriptor == context.upper_listening_file_descriptor) {
+				//new application is conncting
+				int new_client = accept_upper_client(context.upper_listening_file_descriptor);
+
+				if (new_client == -1) {
+					continue;
+				}
+
+				//spec says only one upper layer process at a time
+				if (context.upper_client_file_descriptor != -1) {
+					printf("already have a upper layer client, rejecting new one\n");
+					close(new_client);
+					continue;
+				}
+
+				if (add_to_poll(epoll_file_descriptor, new_lient) == -1) {
+					close(new_client);
+					continue;
+				}
+
+				context.upper_client_file_descriptor = new_client;
+			}
+			else if (ready_file_descriptor == context.raw_socket) {
+				uint8_t frame[MAX_ETHERNET_FRAME_SIZE];
+				ssize_t frame_length = recv(context.raw_socket, frame, sizeof(frame), 0);
+
+				if (frame_length == -1) {
+					perror("recv raw failed");
+				}
+				else {
+					printf("raw frame received, %zd bytes\n", frame_length);
+				}
+			}
+		}
 	}
-
+	
 	/**
 	 *Cleanup of sockets before exiting program.
 	 */
-	close(context.upper_client_file_descriptor);
+	if (context.upper_client_file_descriptor != -1) {
+		close(context.upper_client_file_descriptor);
+	}
+	close(epoll_file_descriptor);
 	close(context.upper_listening_file_descriptor);
 	close(context.raw_socket);
 	unlink(context.socket_upper_path);
