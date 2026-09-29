@@ -543,6 +543,106 @@ static void arp_cache_update(struct daemon_context *context,
 }
 
 
+/*
+ *build a pdu inside an ether frame and send it out a specified interface
+ *
+ *context: daemon state
+ *interface_number: which interface to send to
+ *destination_mac: ethernet destination
+ *destination_mip: mip destination address
+ *ttl: mip time to live before packet is discarded
+ *sdu_type: ARP or PING
+ *sdu: payload
+ *sdu_length: length of payload
+ *
+ *return 0 on success, -1 if packet building or sending fails
+ * with debug mode this will print addresses and arp cache
+ */
+static int send_mip_packet(struct daemon_context *context,
+			unsigned int interface_number,
+			const uint8_t destination_mac[MAC_ADDRESS_LENGTH],
+			uint8_t destination_mip,
+			uint8_t ttl,
+			uint8_t sdu_type,
+			const uint8_t *sdu,
+			size_t sdu_length) {
+	
+	struct mip_header header;
+	uint8_t pdu[MAX_MIP_PDU_SIZE];
+	uint8_t frame[MAX_ETHERNET_FRAME_SIZE];
+	size_t pdu_length;
+	size_t frame_length;
+	const uint8_t *source_mac = context->interfaces[interface_number].sll_addr;
+
+	header.destination = destination_mip;
+	header.source = context->mip_address;
+	header.ttl = ttl;
+	header.sdu_length_words = 0;
+	header.sdu_type = sdu_type;
+
+	if (build_mip_pdu(&header, sdu, sdu_length, pdu, sizeof(pdu), &pdu_length) == -1){
+		fprintf(stderr, "failed to build MIP pdu\n");
+		return -1;
+	}
+
+	if(build_ethernet_frame(destination_mac, source_mac, pdu, pdu_length, frame, sizeof(frame), &frame_length) == -1) {
+		fprintf(stderr, "failed to build ethernet frame\n");
+		return -1;	
+	}
+
+	if(send_ethernet_frame(context, interface_number, destination_mac, frame, frame_length) == -1) {
+		return -1;
+	}
+
+	if (context->debug) {
+		printf("[send] %s MAC ", sdu_type == MIP_SDU_TYPE_ARP ? "MAP_ARP" : "PING");
+		print_mac_address(source_mac, MAC_ADDRESS_LENGTH);
+		printf(" -> ");
+		print_mac_address(destination_mac, MAC_ADDRESS_LENGTH);
+		printf(" MIP %u -> %u\n", context->mip_address, destination_mip);
+		print_arp_cache(context);
+	}
+
+	return 0;
+}
+
+
+/**
+ *Pack a mip-arp message into 4 byte sdu (type 1 bit, address 8 bits, 23 padd)
+ *
+ *type: MIP_ARP_REQUEST or MIP_ARP_RESPONSE
+ *address: the mip address requested / answered
+ *output: 4 byte buffer receiving the SDU put in network byte order by utonl
+ *
+ *no return
+ */
+static void encode_arp_sdu(uint8_t type, uint8_t address, uint8_t output[MIP_ARP_SDU_SIZE]) {
+	uint32_t packed;
+
+	packed = ((uint32_t)(type & 0x01) << 31) | ((uint32_t)address << 23);
+	packed = htonl(packed);
+	memcpy(output, &packed, MIP_ARP_SDU_SIZE);
+}
+
+
+/**
+ *unpack 4 byte mip-arp sdu
+ *
+ *input: the 4 sdu bytes in network byte order
+ *type, address: receive decoded fields
+ *
+ * no return
+ */
+static void decode_arp_sdu(const uint8_t input[MIP_ARP_SDU_SIZE], uint8_t *type, uint8_t *address) {
+	uint32_t packed;
+
+	memcpy(&packed, input, MIP_ARP_SDU_SIZE);
+	packed = ntohl(packed);
+
+	*type = (uint8_t)((packed >> 31) & 0x01);
+	*address = (uint8_t)((packed >> 23) & 0xFF);
+}
+
 
 int main(int argc, char *argv[]){
 	struct daemon_context context = {

@@ -35,7 +35,7 @@
 //MIP ARP message types
 #define MIP_ARP_REQUEST 0x00
 #define MIP_ARP_RESPONSE 0x01
-#define MIP_ARL_SDU_SIZE 4u			//type(1)+address(8)+padding(23) = 32
+#define MIP_ARP_SDU_SIZE 4u			//type(1)+address(8)+padding(23) = 32
 						
 #define ARP_CACHE_SIZE 256			//one slot per possible 8 bit MIP address
 
