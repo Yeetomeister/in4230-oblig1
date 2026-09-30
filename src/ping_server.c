@@ -16,7 +16,7 @@
  *no return, only print
  */
 static void print_usage(const char *program_name) {
-	printf("usage: %s [-h] <socket_lowed>\n", program_name);
+	printf("usage: %s [-h] <socket_lower>\n", program_name);
 }
 
 /*
@@ -31,7 +31,7 @@ static int connect_to_daemon(const char *socket_path) {
 	struct sockaddr_un address;
 	int file_descriptor;
 
-	file descriptor = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+	file_descriptor = socket(AF_UNIX, SOCK_SEQPACKET, 0);
 
 	if (file_descriptor == -1) {
 		perror("failed at establishing socket");
@@ -47,7 +47,7 @@ static int connect_to_daemon(const char *socket_path) {
 		return -1;
 	}
 
-	strncpy(address.sun_path, socket_path, sizeof(address.sn_path) - 1);
+	strncpy(address.sun_path, socket_path, sizeof(address.sun_path) - 1);
 
 	if (connect(file_descriptor, (struct sockaddr *)&address, sizeof(address)) == -1) {
 		perror("failed to connect");
@@ -55,7 +55,7 @@ static int connect_to_daemon(const char *socket_path) {
 		return -1;
 	}
 
-	return file_descriptor
+	return file_descriptor;
 }
 
 int main(int argc, char *argv[]) {
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
 		printf("received from MIP %u: %s\n", (unsigned int)buffer[0], text);
 
 		//only answer ping
-		if (strcmp(text, "PING:", 5) != 0) {
+		if (strncmp(text, "PING:", 5) != 0) {
 			continue;
 		}
 
