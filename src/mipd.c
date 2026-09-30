@@ -121,6 +121,8 @@ static int accept_upper_client(int listening_file_descriptor) {
 
 }
 
+//because c only knows functions that are prior we have to create a promise that this function exist prior to receive_upper_layer_message
+static int send_or_queue(struct daemon_context *context, uint8_t destination, const uint8_t *sdu, size_t sdu_length);
 /**
  *Receive one message from connected upper layer appliction
  * message format from specification [8bit MIP address][payload (sdu)]
@@ -152,12 +154,17 @@ static int receive_upper_layer_message(struct daemon_context *context) {
 		return -1;
 	}
 
-	printf("received message destined for address: %u\n", (unsigned int)buffer[0]);
-	printf("Payload: ");
-	//write buffer out as raw data
-	fwrite(buffer + 1, 1, (size_t)received_bytes -1, stdout);
-	printf("\n");
-	
+	if(context->debug) {
+		printf("[upper] message for MIP %u: ", (unsigned int)buffer[0]);
+		fwrite(buffer + 1, 1, (size_t)received_bytes - 1, stdout);
+		printf("\n");
+	}
+
+	//buffer[0] is dst address. Rest is sdu
+	if(send_or_queue(context, buffer[0], buffer + 1, (size_t)received_bytes -1) == -1) {
+		return -1;
+	}
+
 	//return 1 to denote success
 	return 1;
 }
@@ -641,6 +648,69 @@ static void decode_arp_sdu(const uint8_t input[MIP_ARP_SDU_SIZE], uint8_t *type,
 
 	*type = (uint8_t)((packed >> 31) & 0x01);
 	*address = (uint8_t)((packed >> 23) & 0xFF);
+}
+
+
+/*
+ *broadcast a mip-arp request on every interface
+ *
+ *context: daemon state
+ *lookup_address: MIP that we want the MAC for
+ *
+ *returns 0 if arp was sent on a least one interface, otherwise retunr -1
+ */
+static int send_arp_request(struct daemon_context *context, uint8_t lookup_address) {
+	const uint8_t broadcast_mac[MAC_ADDRESS_LENGTH] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	uint8_t sdu[MIP_ARP_SDU_SIZE];
+	unsigned int i;
+	int sent = 0;
+
+	encode_arp_sdu(MIP_ARP_REQUEST, lookup_address, sdu);
+
+	for (i = 0; i < context->interface_count; i++) {
+		if(send_mip_packet(context, i, broadcast_mac, MIP_ADDR_BROADCAST, MIP_TTL_BROADCAST, MIP_SDU_TYPE_ARP, sdu, sizeof(sdu)) == 0){
+			sent++;
+		}
+	}
+
+	if (sent > 0) {
+		return 0;
+	}
+	else {
+		return -1;
+	}
+}
+
+
+/**
+ *send sdu from upper layer to a destination or park the sdu and send arp first
+ *
+ *context: daemon state for arp cache and pending slot
+ *destination: mip address from the first byte of the upper layer messsage. indicating dest
+ *sdu, sdu_length: remaining message which is payload and payload length
+ *
+ *return 0 if packet was sent or queued. -1 on error for too long message or send error.
+ */
+static int send_or_queue(struct daemon_context *context, uint8_t destination, const uint8_t *sdu, size_t sdu_length) {
+	struct arp_entry *entry = &context->arp_cache[destination];
+
+	if (sdu_length > MAX_SDU_BYTES){
+		fprintf(stderr, "message too long for mip sdu");
+		return -1;
+	}
+
+	//if cache hit for mac and interface we can send imediately
+	if (entry->valid) {
+		return send_mip_packet(context, entry->interface_number, entry->mac_address, destination, MIP_TTL_DEFAULT, MIP_SDU_TYPE_PING, sdu, sdu_length);
+	}
+
+	//cache miss. We keep the packet and send arp request.
+	context->pending.active = true;
+	context->pending.destination = destination;
+	memcpy(context->pending.sdu, sdu, sdu_length);
+	context->pending.sdu_length = sdu_length;
+
+	return send_arp_request(context, destination);
 }
 
 
