@@ -2,13 +2,11 @@ raw mip socket was created
 Found 1 network interfaces
 Interface index 2, mac 00:00:00:00:00:01
 mipd running with MIP address 10
-waiting for message
 local client connected
 [upper] message for MIP 20: PING:hei
-[send] MAP_ARP MAC 00:00:00:00:00:01 -> ff:ff:ff:ff:ff:ff MIP 10 -> 255
+[send] MIP_ARP MAC 00:00:00:00:00:01 -> ff:ff:ff:ff:ff:ff MIP 10 -> 255
 MIP-ARP cache:
  arp cache empty
-Client closed connection without sending data
 local application disconnect
 [recv] MIP_ARP MAC 00:00:00:00:00:02 -> 00:00:00:00:00:01 MIP 20 -> 10
 [send] PING MAC 00:00:00:00:00:01 -> 00:00:00:00:00:02 MIP 10 -> 20

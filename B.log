@@ -1,10 +1,10 @@
 raw mip socket was created
 Found 2 network interfaces
 Interface index 2, mac 00:00:00:00:00:02
-Interface index 3, mac e6:c8:93:47:fd:7e
+Interface index 3, mac 3e:d6:67:d7:54:35
 mipd running with MIP address 20
 [recv] MIP_ARP MAC 00:00:00:00:00:01 -> ff:ff:ff:ff:ff:ff MIP 10 -> 255
-[send] MAP_ARP MAC 00:00:00:00:00:02 -> 00:00:00:00:00:01 MIP 20 -> 10
+[send] MIP_ARP MAC 00:00:00:00:00:02 -> 00:00:00:00:00:01 MIP 20 -> 10
 MIP-ARP cache:
  MIP  10 -> 00:00:00:00:00:01 (interface index 2)
 MIP-ARP cache:
