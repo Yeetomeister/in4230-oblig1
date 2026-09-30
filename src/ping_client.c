@@ -91,6 +91,8 @@ int main(int argc, char *argv[]){
 	}
 	
 
+	buffer[0] = destination_address;
+
 	//snprintf is used to put string into buffer
 	//+1 because mip address i a [0].
 	payload_length = snprintf((char *)(buffer + 1), sizeof(buffer) - 1, "PING:%s", message);
@@ -137,6 +139,12 @@ int main(int argc, char *argv[]){
 			close(file_descriptor);
 			return 1;
 		}
+		if (received_bytes == 0) {
+			fprintf(stderr, "daemon closed connection\n");
+			close(file_descriptor);
+			return 1;
+		}
+
 
 		reply[received_bytes] = '\0';
 
