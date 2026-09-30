@@ -22,6 +22,14 @@ void print_usage(const char *program_name){
 	printf("usage: %s [-h] [-d] <socket_upper> <MIP address>\n", program_name);
 }
 
+/*
+ *
+ *
+ *TODO
+ *
+ *
+ *
+ */
 static int parse_mip_address(const char *text, uint8_t *result){
 	char *end;
 	unsigned long value;
@@ -40,6 +48,10 @@ static int parse_mip_address(const char *text, uint8_t *result){
 /**
  *Create a file descriptor that listens for connections from client.
  *Perform some error checking before returning a hopefully valid FD.
+ *
+ *socket_path: file path for which file we want a unix socket on. 
+ *
+ *return file descriptor for created socket, or -1 on error.
  *
  *Inspired by chat.c used in plnary 09.02.26
  *https://github.com/kristjoc/plenaries-in3230-in4230-h26/blob/main/p2_02-09-2026/sockets/unix_sockets/chat.c
@@ -168,6 +180,13 @@ static int receive_upper_layer_message(struct daemon_context *context) {
 }
 
 /**
+ *
+ *
+ *TODO
+ *
+ *
+ *
+ *
  *Basically copy paste of line 180
 https://github.com/kristjoc/plenaries-in3230-in4230-h26/blob/main/p2_02-09-2026/sockets/raw_sockets/sender.c
  */
@@ -185,7 +204,8 @@ static int create_mip_raw_socket(void) {
 /**
  *Find packet interfaces
  *
- *the context supplied will receive the discovered interfaces to their sockaddr_ll interface list.
+ *context: daemon state that  will receive the discovered interfaces to their sockaddr_ll interface list.
+ *
  * Return 0 if one or multiple interfaces was found, -1 on error.
  */
 static int discover_interfaces(struct daemon_context *context) {
@@ -235,7 +255,7 @@ static int discover_interfaces(struct daemon_context *context) {
 
 }
 
-
+//TODO
 static void print_mac_address(const unsigned char *mac, unsigned char length) {
 	unsigned int i;
 
@@ -375,7 +395,7 @@ static int build_mip_pdu(const struct mip_header *header,
  *
  *
  *
- *
+ *TODO
  *
  *
  *
@@ -411,7 +431,7 @@ static int build_ethernet_frame(const uint8_t destination_mac[6],
 	return 0;
 }
 
-
+//TODO
 static int send_ethernet_frame(struct daemon_context *context,
 				unsigned int interface_number,
 				const uint8_t destination_mac[6],

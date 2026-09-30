@@ -1,0 +1,1 @@
+/home/debian/oblig-mn-script.py
