@@ -24,4 +24,4 @@ src/ping_server.o: src/ping_server.c
 	$(CC) $(CFLAGS) -c src/ping_server.c -o src/ping_server.o
 
 clean:
-	rm -f $(TARGETS) src/mipd.o src/ping_client.o
+	rm -f $(TARGETS) src/mipd.o src/ping_client.o src/ping_server.o
