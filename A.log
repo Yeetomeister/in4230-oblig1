@@ -10,3 +10,9 @@ MIP-ARP cache:
  arp cache empty
 Client closed connection without sending data
 local application disconnect
+[recv] MIP_ARP MAC 00:00:00:00:00:02 -> 00:00:00:00:00:01 MIP 20 -> 10
+[send] PING MAC 00:00:00:00:00:01 -> 00:00:00:00:00:02 MIP 10 -> 20
+MIP-ARP cache:
+ MIP  20 -> 00:00:00:00:00:02 (interface index 2)
+MIP-ARP cache:
+ MIP  20 -> 00:00:00:00:00:02 (interface index 2)
