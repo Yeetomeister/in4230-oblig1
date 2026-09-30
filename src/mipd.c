@@ -713,6 +713,172 @@ static int send_or_queue(struct daemon_context *context, uint8_t destination, co
 	return send_arp_request(context, destination);
 }
 
+/*
+ *pass a received sdu up to connected app in format [source mip][sdu]
+ *
+ *context: daemon state with upper client socket
+ *source: mmip address of the sender
+ *sdu, sdu_length: payload of redeived PDU
+ *
+ *return 0 on success, -1 if no app is connected or sending fails
+ *
+ */
+static int send_to_upper_layer(struct daemon_context *context, uint8_t source, const uint8_t *sdu, size_t sdu_length) {
+	uint8_t buffer[1 + MAX_SDU_BYTES];
+
+	if (context->upper_client_file_descriptor == -1) {
+		printf("no local app connected, dropping packet from MIP %u \n", source);
+		return -1;
+	}
+
+	buffer[0] = source;
+	memcpy(buffer + 1, sdu, sdu_length);
+
+	if(send(context->upper_client_file_descriptor, buffer, sdu_length + 1, 0) == -1) {
+		perror("send to upper layer failed");
+		return -1;
+	}
+	
+	return 0;
+}
+
+/*
+ *handle mip-atp sdu like specified in 6.2
+ *request for our address: learn sender and answer the interface it arrived on
+ *response: learn sender and send the pending packet if it was waiting for this address
+ *
+ *context: daemon state
+ *header: decoded MIP header of the received PDU.
+ *source_mac: ethernet source of the frame
+ *interface_number: which of our interfaces taht the frame arrive on
+ *sdu, sdu_length the arp sdu itself
+ *
+ * retunrs 0 on successful handling(regardless if packet was for us of not) and -1 on error.
+ */
+static int handle_arp(struct daemon_context *context,
+			const struct mip_header *header,
+			const uint8_t source_mac[MAC_ADDRESS_LENGTH],
+			unsigned int interface_number,
+			const uint8_t *sdu,
+			size_t sdu_length) {
+	
+	uint8_t type;
+	uint8_t address;
+	uint8_t response[MIP_ARP_SDU_SIZE];
+
+	//catch invalid arp sdu
+	if (MIP_ARP_SDU_SIZE > sdu_length) {
+		return -1;
+	}
+
+	decode_arp_sdu(sdu, &type, &address);
+
+	if (type == MIP_ARP_REQUEST) {
+		//request is not for us, but we handled correctly and therefore return 0
+		if(address != context->mip_address) {
+			return 0;
+		}
+
+		arp_cache_update(context, header->source, source_mac, interface_number);
+
+		encode_arp_sdu(MIP_ARP_RESPONSE, context->mip_address, response);
+
+		return send_mip_packet(context, interface_number, source_mac, header->source, MIP_TTL_BROADCAST, MIP_SDU_TYPE_ARP, response, sizeof(response));
+	}
+
+	//arp response
+	arp_cache_update(context, header->source, source_mac, interface_number);
+
+	if (context->pending.active && context->pending.destination == header->source) {
+		context->pending.active = false;
+		return send_or_queue(context, context->pending.destination, context->pending.sdu, context->pending.sdu_length);
+	}
+
+	return 0;
+}
+
+/*
+ *read one frame from the raw socket and parse + dispatch it on sdu type
+ *
+ *context: daemon state
+ *
+ *returns 0 when frame was handled or ignored, -1 on error.
+ *frames that are too short, have bad length field or are not addressed to us are dropped
+ */
+static int handle_raw_frame(struct daemon_context *context) {
+	uint8_t frame[MAX_ETHERNET_FRAME_SIZE];
+	struct sockaddr_ll from;
+	socklen_t from_length = sizeof(from);
+	ssize_t frame_length;
+	struct mip_header header;
+	const uint8_t *destination_mac;
+	const uint8_t *source_mac;
+	const uint8_t *sdu;
+	size_t sdu_length;
+	int interface_number;
+
+	frame_length = recvfrom(context->raw_socket, frame, sizeof(frame), 0, (struct sockaddr *)&from, &from_length);
+
+	if(frame_length == -1) {
+		perror("recv from failed for raw");
+		return -1;
+	}
+
+	if((size_t)frame_length < ETHERNET_HEADER_SIZE + MIP_HEADER_SIZE) {
+		return 0;
+	}
+
+	interface_number = find_interface_by_index(context, from.sll_ifindex);
+
+	if (interface_number == -1) {
+		return 0;
+	}
+
+	destination_mac = frame;
+	source_mac = frame + MAC_ADDRESS_LENGTH;
+
+	decode_mip_header(frame + ETHERNET_HEADER_SIZE, &header);
+
+	sdu = frame + ETHERNET_HEADER_SIZE + MIP_HEADER_SIZE;
+	sdu_length = (size_t)header.sdu_length_words * 4;
+
+	if (ETHERNET_HEADER_SIZE + MIP_HEADER_SIZE + sdu_length > (size_t)frame_length) {
+		fprintf(stderr, "SDU length field is lnger than frame. dropping\n");
+		return 0;
+	}
+
+	//only for us or broadcast
+	if (header.destination != context->mip_address && header.destination != MIP_ADDR_BROADCAST) {
+		return 0;
+	}
+
+	if (context->debug) {
+		printf("[recv] %s MAC ", header.sdu_type == MIP_SDU_TYPE_ARP ? "MIP_ARP" : "PING");
+		print_mac_address(source_mac, MAC_ADDRESS_LENGTH);
+		printf(" -> ");
+		print_mac_address(destination_mac, MAC_ADDRESS_LENGTH);
+		printf(" MIP %u -> %u\n", header.source, header.destination);
+	}
+
+	switch (header.sdu_type) {
+		case MIP_SDU_TYPE_ARP:
+			handle_arp(context, &header, source_mac, (unsigned int)interface_number, sdu, sdu_length);
+			break;
+		case MIP_SDU_TYPE_PING:
+			send_to_upper_layer(context, header.source, sdu, sdu_length);
+			break;
+		default:
+			printf("unknown sdu type %u, dropping\n", header.sdu_type);
+			break;
+	}
+
+	if (context->debug) {
+		print_arp_cache(context);
+	}
+
+	return 0;
+}
+
 
 int main(int argc, char *argv[]){
 	struct daemon_context context = {
@@ -880,15 +1046,8 @@ int main(int argc, char *argv[]){
 
 
 			else if (ready_file_descriptor == context.raw_socket) {
-				uint8_t frame[MAX_ETHERNET_FRAME_SIZE];
-				ssize_t frame_length = recv(context.raw_socket, frame, sizeof(frame), 0);
-
-				if (frame_length == -1) {
-					perror("recv raw failed");
-				}
-				else {
-					printf("raw frame received, %zd bytes\n", frame_length);
-				}
+				//frame from neighbor, arp or ping
+				handle_raw_frame(&context);
 			}
 		}
 	}
@@ -898,6 +1057,7 @@ int main(int argc, char *argv[]){
 	 */
 	if (context.upper_client_file_descriptor != -1) {
 		close(context.upper_client_file_descriptor);
+		context.pending.active = false;
 	}
 	close(epoll_file_descriptor);
 	close(context.upper_listening_file_descriptor);
