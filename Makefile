@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=gnu11
-TARGETS = mipd ping_client
+TARGETS = mipd ping_client ping_server
 .PHONY: all clean
 
 all: $(TARGETS)
