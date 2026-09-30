@@ -1,10 +1,15 @@
+/*
+ * No global variables are used in this daemon. All states are kept in the struct daemon_context and passed to functions as needed.
+ */
+
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 //Includes for initial unix socket attempt.
-#include <sys/epoll.h> //use epoll as we want a fifo queue of incoming requests for the server aka node b
+#include <sys/epoll.h> //use epoll as we want a queue of incoming requests
 #include <sys/socket.h>
 #include <sys/un.h>
 
@@ -18,17 +23,26 @@
 
 #include "../include/mipd.h"
 
+
+/*
+ *print how to run the program
+ *
+ *program_name: argv[0]
+ *
+ *does not return any value, only prints.
+ */
 void print_usage(const char *program_name){
 	printf("usage: %s [-h] [-d] <socket_upper> <MIP address>\n", program_name);
 }
 
+
 /*
+ *converts text into a mip address
  *
+ *text: the string from the command line
+ *result: receives the mip address given that it was valid
  *
- *TODO
- *
- *
- *
+ *returns 0 on success or -1 on error.
  */
 static int parse_mip_address(const char *text, uint8_t *result){
 	char *end;
@@ -180,12 +194,10 @@ static int receive_upper_layer_message(struct daemon_context *context) {
 }
 
 /**
+ *create the raw AF_PACKET socket that sends and receives ethernet frames with ethertype ETH_P_MIP
+ *only mip frames are delivered to it because of the protocol argument
  *
- *
- *TODO
- *
- *
- *
+ *returns socket file descriptor or -1 on error.
  *
  *Basically copy paste of line 180
 https://github.com/kristjoc/plenaries-in3230-in4230-h26/blob/main/p2_02-09-2026/sockets/raw_sockets/sender.c
@@ -255,7 +267,14 @@ static int discover_interfaces(struct daemon_context *context) {
 
 }
 
-//TODO
+/*
+ *print a mac address as hex bytes seperated by ":"
+ *
+ *mac: pointer to the address bytes
+ *length: the number of bytes, which should be 6
+ *
+ * no return, only print
+ */
 static void print_mac_address(const unsigned char *mac, unsigned char length) {
 	unsigned int i;
 
@@ -392,14 +411,15 @@ static int build_mip_pdu(const struct mip_header *header,
 
 
 /**
+ *put a MIP PDU into an ethernet frame. dst mac(6) + src mac(6) + ethertype 0x88b5(2) + PDU
  *
+ *source_mac, destination_mac: 6 byte mac address
+ *pdu, pdu_length: the MIP pdu from build_mip_pdu
+ *frame: output buffer
+ *frame_capacity: output buffer size in bytes
+ *frame_length: receives the total number of bytes written
  *
- *
- *TODO
- *
- *
- *
- *
+ *returns 0 on success, -1 on null arguments or if frame does not fit in the given buffer
  */
 static int build_ethernet_frame(const uint8_t destination_mac[6],
 				const uint8_t source_mac[6],
@@ -431,7 +451,16 @@ static int build_ethernet_frame(const uint8_t destination_mac[6],
 	return 0;
 }
 
-//TODO
+/*
+ *send a finished ethernet frame out of an interface with sendto() over a raw socket
+ *
+ *contex: daemon state. Raw socket and interface list
+ *interface_number: the index into context->interfaces that chooses outgoing interface.
+ *destination_mac: a 6 byte MAC put into sockaddr_ll for the kernel.
+ *frame, frame_length: the complete frame built by build_ethernet_frame
+ *
+ *returns 0 on success, -1 on NULL arguments, invalid interface number or error by sendto
+ */
 static int send_ethernet_frame(struct daemon_context *context,
 				unsigned int interface_number,
 				const uint8_t destination_mac[6],
@@ -897,7 +926,11 @@ static int handle_raw_frame(struct daemon_context *context) {
 	return 0;
 }
 
-
+/*
+ *entry point of the mip daemon. Parses input arguments, set up unix socket, raw socket and interfaces. Then runs epoll event loop forever.
+ *
+ *return 0 on normal exit, 1 on bad arguments or if socket could not be set up
+ */
 int main(int argc, char *argv[]){
 	struct daemon_context context = {
 		.debug = false,

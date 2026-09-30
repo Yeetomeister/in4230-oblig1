@@ -16,7 +16,15 @@ static void print_usage(const char *program_name) {
 	printf("usage: %s [-h] <socket_lower> <message> <destination_host>\n", program_name);
 }
 
-//Reuse of mipd, still havent figured out copy paste or "yanking" in VIM so this is nice
+/*
+ *convert text argument mip address
+ *
+ *text: string from command line
+ *result: receives the mip address if it's valid.
+ *
+ *returns 0 on success or -1 if the input text is invalid.
+ * should be identical to mipd, but havent figured out yanking/pasting in VIM.
+ */
 static int parse_mip_address(const char *text, uint8_t *result) {
 	char *end;
 	unsigned long value;
@@ -31,6 +39,13 @@ static int parse_mip_address(const char *text, uint8_t *result) {
 	return 0;
 }
 
+
+/*
+ *sends "PING:<message>" to a mip address through the local daemon using a unix socket.
+ *waits at most 1 second for matching PONG message and prints the RTT.
+ *
+ *returns 0 when a matching pong arrived, 1 on timeout or error.
+ */
 int main(int argc, char *argv[]){
 	struct sockaddr_un address;
 	uint8_t buffer[1024];
