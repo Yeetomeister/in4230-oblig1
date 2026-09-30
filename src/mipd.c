@@ -734,6 +734,8 @@ int main(int argc, char *argv[]){
 	int ready_count;			//num of ready sockets. returned by epoll_wait
 	int i;
 
+	setvbuf(stdout, NULL, _IOLBF, 0); //write out everything for testing with mininet running
+
 	if (argc == 2 && strcmp(argv[1], "-h") == 0) {
 		print_usage(argv[0]);
 		return 0;
