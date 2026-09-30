@@ -106,8 +106,6 @@ static int create_upper_listening_socket(const char *socket_path){
 static int accept_upper_client(int listening_file_descriptor) {
 	int client_file_descriptor;
 
-	printf("waiting for message\n");//accept will hang, so nice to know we reached the correct point
-
 	client_file_descriptor = accept(listening_file_descriptor, NULL, NULL);
 
 	if (client_file_descriptor == -1) {
@@ -144,7 +142,7 @@ static int receive_upper_layer_message(struct daemon_context *context) {
 
 	//0 denotes that connection was closed, so this return value is useful
 	if (received_bytes == 0) {
-		printf("Client closed connection without sending data\n");
+		//printf("Client closed connection without sending data\n");
 		return 0;
 	}
 
@@ -602,7 +600,7 @@ static int send_mip_packet(struct daemon_context *context,
 	}
 
 	if (context->debug) {
-		printf("[send] %s MAC ", sdu_type == MIP_SDU_TYPE_ARP ? "MAP_ARP" : "PING");
+		printf("[send] %s MAC ", sdu_type == MIP_SDU_TYPE_ARP ? "MIP_ARP" : "PING");
 		print_mac_address(source_mac, MAC_ADDRESS_LENGTH);
 		printf(" -> ");
 		print_mac_address(destination_mac, MAC_ADDRESS_LENGTH);
